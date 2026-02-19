@@ -1,0 +1,20 @@
+{
+  "name": "ai-company-slack-bot",
+  "version": "1.0.0",
+  "description": "AI 에이전시 팀 에이전트 슬랙봇 - CLAUDE.md 기반 멀티팀 AI 어시스턴트",
+  "main": "src/app.ts",
+  "scripts": {
+    "start": "tsx src/app.ts",
+    "dev": "tsx watch src/app.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@slack/bolt": "^4.1.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

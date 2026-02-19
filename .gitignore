@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment variables (API keys, tokens)
+.env
+.env.local
+
+# Backup files
+*.bak
+
+# SQLite databases
+*.db
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / local tools
+.vscode/
+.idea/
+.claude/
+.bkit/
+
+# Build output
+dist/
