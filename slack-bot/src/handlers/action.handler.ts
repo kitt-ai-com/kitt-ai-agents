@@ -2,6 +2,7 @@ import type { App } from '@slack/bolt';
 import { TEAMS } from '../config.js';
 import { appendToClaudeMd } from '../services/claudemd.service.js';
 import { pendingRegistrations } from '../services/review.service.js';
+import { autoCommitAndPush } from '../services/git.service.js';
 
 /** 버튼 클릭 액션 핸들러를 등록한다 */
 export function registerActionHandlers(app: App): void {
@@ -21,6 +22,7 @@ export function registerActionHandlers(app: App): void {
       const typeLabel = pending.type === 'learning' ? '💡 학습' : '⛔ 기준';
       await respondInThread(client, pending.channelId, pending.threadTs,
         `✅ ${team.emoji} ${team.name}에 ${typeLabel} 등록 완료!\n> ${pending.original}`);
+      autoCommitAndPush(team.name, pending.type, pending.original, pending.userId);
     } catch (err: any) {
       await respondInThread(client, pending.channelId, pending.threadTs,
         `❌ 등록 실패: ${err.message}`);
@@ -45,6 +47,7 @@ export function registerActionHandlers(app: App): void {
       const typeLabel = pending.type === 'learning' ? '💡 학습' : '⛔ 기준';
       await respondInThread(client, pending.channelId, pending.threadTs,
         `✅ ${team.emoji} ${team.name}에 ${typeLabel} 등록 완료! (개선안)\n> ${pending.improved}`);
+      autoCommitAndPush(team.name, pending.type, pending.improved!, pending.userId);
     } catch (err: any) {
       await respondInThread(client, pending.channelId, pending.threadTs,
         `❌ 등록 실패: ${err.message}`);
@@ -108,6 +111,7 @@ export function registerActionHandlers(app: App): void {
       const typeLabel = pending.type === 'learning' ? '💡 학습' : '⛔ 기준';
       await respondInThread(client, pending.channelId, pending.threadTs,
         `✅ ${team.emoji} ${team.name}에 ${typeLabel} 등록 완료! (직접 수정)\n> ${customContent}`);
+      autoCommitAndPush(team.name, pending.type, customContent, pending.userId);
     } catch (err: any) {
       await respondInThread(client, pending.channelId, pending.threadTs,
         `❌ 등록 실패: ${err.message}`);
