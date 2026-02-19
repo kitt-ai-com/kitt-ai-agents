@@ -9,6 +9,9 @@ export const ENV = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,
   CLAUDE_MODEL: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929',
   AGENTS_ROOT_PATH: process.env.AGENTS_ROOT_PATH || '../',
+  GOOGLE_CLIENT_EMAIL: process.env.GOOGLE_CLIENT_EMAIL || '',
+  GOOGLE_PRIVATE_KEY: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  GOOGLE_DRIVE_FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
 };
 
 /** 팀 설정 맵 (키: 정식 이름) */
@@ -87,6 +90,44 @@ export function resolveTeamKey(input: string): string | null {
   const normalized = input.trim();
   if (TEAMS[normalized]) return normalized;
   if (TEAM_ALIASES[normalized]) return TEAM_ALIASES[normalized];
+  return null;
+}
+
+/**
+ * 채널 이름 → 팀 키 매핑
+ * 채널 이름에 팀 별칭이 포함되면 자동으로 해당 팀으로 인식한다.
+ * 예: #ct → 콘텐츠, #mk-general → 마케팅
+ */
+export const CHANNEL_TEAM_MAP: Record<string, string> = {
+  ct: '콘텐츠',
+  mk: '마케팅',
+  ds: '디자인',
+  dev: '개발',
+  ec: '이커머스',
+  fn: '재무',
+  st: '전략',
+  ac: '에이전트컨설팅',
+  content: '콘텐츠',
+  marketing: '마케팅',
+  design: '디자인',
+  development: '개발',
+  ecommerce: '이커머스',
+  finance: '재무',
+  strategic: '전략',
+  consulting: '에이전트컨설팅',
+};
+
+/** 채널 이름으로 팀 키를 추론한다 */
+export function resolveTeamByChannel(channelName: string): string | null {
+  const name = channelName.toLowerCase();
+  // 정확히 일치
+  if (CHANNEL_TEAM_MAP[name]) return CHANNEL_TEAM_MAP[name];
+  // 채널 이름이 팀 별칭으로 시작하는 경우 (예: ct-general, mk-campaign)
+  for (const [prefix, teamKey] of Object.entries(CHANNEL_TEAM_MAP)) {
+    if (name.startsWith(prefix + '-') || name.startsWith(prefix + '_')) {
+      return teamKey;
+    }
+  }
   return null;
 }
 

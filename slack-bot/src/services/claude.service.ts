@@ -4,20 +4,115 @@ import type { ConversationMessage } from '../types.js';
 
 const client = new Anthropic({ apiKey: ENV.ANTHROPIC_API_KEY });
 
+/** 슬랙 응답 간결성 유도 */
+const SLACK_PREFIX = `[응답 규칙] 슬랙 메시지로 응답합니다. 핵심만 간결하게, 불필요한 서론·인사말·반복 없이 실용적 내용 위주로 작성하세요. 응답은 3000자 이내로 제한하세요.\n\n`;
+
+/** 파일 처리용 시스템 프리픽스 */
+export const FILE_PROCESSING_PREFIX = `[필수 응답 규칙]
+당신은 데이터 처리 엔진입니다. 사용자의 지시사항에 따라 결과물만 출력하세요.
+
+## HTML 보고서 요청 시 (사용자가 "HTML", "보고서", "리포트" 등을 언급한 경우):
+- 반드시 <!DOCTYPE html>로 시작하는 완전한 HTML 문서를 바로 출력하세요
+- "보고서를 만들겠습니다", "잠시만 기다려주세요", "분석해보겠습니다" 같은 안내 문구를 절대 쓰지 마세요
+- 설명 텍스트 없이 HTML 코드만 출력하세요. 마크다운 코드 블록(\`\`\`)으로 감싸지 마세요
+- 인라인 CSS로 깔끔한 테이블, 차트, 레이아웃을 만드세요
+- 외부 CDN을 참조하지 마세요
+- 한국어로 작성하세요
+
+## 분석/요약 요청 시 (HTML 언급 없는 경우):
+- 일반 텍스트로 핵심만 간결하게 응답하세요
+- 3000자 이내로 제한하세요\n\n`;
+
+/** API 전송 시 최대 이력 수 */
+const MAX_HISTORY = 10;
+
+/** Slack 메시지 최대 길이 (안전 마진 포함) */
+export const SLACK_MAX_LENGTH = 3500;
+
+/** 스트리밍 미리보기용 자르기 */
+export function truncateForSlack(text: string): string {
+  if (text.length <= SLACK_MAX_LENGTH) return text;
+  return text.substring(0, SLACK_MAX_LENGTH) + '...';
+}
+
+/** 긴 메시지를 여러 청크로 분할 */
+export function splitForSlack(text: string): string[] {
+  if (text.length <= SLACK_MAX_LENGTH) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= SLACK_MAX_LENGTH) {
+      chunks.push(remaining);
+      break;
+    }
+
+    // 줄바꿈 기준으로 자연스럽게 분할
+    let cutAt = remaining.lastIndexOf('\n', SLACK_MAX_LENGTH);
+    if (cutAt < SLACK_MAX_LENGTH * 0.5) {
+      // 줄바꿈이 너무 앞에 있으면 공백 기준
+      cutAt = remaining.lastIndexOf(' ', SLACK_MAX_LENGTH);
+    }
+    if (cutAt < SLACK_MAX_LENGTH * 0.5) {
+      cutAt = SLACK_MAX_LENGTH;
+    }
+
+    chunks.push(remaining.substring(0, cutAt));
+    remaining = remaining.substring(cutAt).trimStart();
+  }
+
+  return chunks;
+}
+
 /**
- * Claude API를 호출하여 응답을 생성한다.
+ * Claude API를 스트리밍으로 호출한다.
  * @param systemPrompt  CLAUDE.md 내용 (시스템 프롬프트)
  * @param messages      대화 이력 + 현재 메시지
+ * @param onText        텍스트 누적 시 콜백 (실시간 업데이트용)
+ */
+export async function askClaudeStream(
+  systemPrompt: string,
+  messages: ConversationMessage[],
+  onText?: (accumulated: string) => void,
+  options?: { maxTokens?: number; systemPrefix?: string },
+): Promise<string> {
+  const trimmed = messages.slice(-MAX_HISTORY);
+  const maxTokens = options?.maxTokens ?? 1500;
+  const prefix = options?.systemPrefix ?? SLACK_PREFIX;
+
+  const stream = client.messages.stream({
+    model: ENV.CLAUDE_MODEL,
+    max_tokens: maxTokens,
+    system: prefix + systemPrompt,
+    messages: trimmed.map((m) => ({ role: m.role, content: m.content })),
+  });
+
+  let accumulated = '';
+  stream.on('text', (text) => {
+    accumulated += text;
+    if (onText) onText(accumulated);
+  });
+
+  const finalMessage = await stream.finalMessage();
+  const textBlock = finalMessage.content.find((b) => b.type === 'text');
+  return textBlock ? textBlock.text : '(응답을 생성하지 못했습니다)';
+}
+
+/**
+ * Claude API를 호출하여 응답을 생성한다 (비스트리밍).
  */
 export async function askClaude(
   systemPrompt: string,
   messages: ConversationMessage[],
 ): Promise<string> {
+  const trimmed = messages.slice(-MAX_HISTORY);
+
   const response = await client.messages.create({
     model: ENV.CLAUDE_MODEL,
-    max_tokens: 4096,
-    system: systemPrompt,
-    messages: messages.map((m) => ({
+    max_tokens: 1500,
+    system: SLACK_PREFIX + systemPrompt,
+    messages: trimmed.map((m) => ({
       role: m.role,
       content: m.content,
     })),
@@ -29,7 +124,6 @@ export async function askClaude(
 
 /**
  * 학습/기준 등록 검토를 Claude에게 요청한다.
- * 5가지 항목을 분석하여 JSON 형태로 반환받는다.
  */
 export async function reviewWithClaude(
   systemPrompt: string,
@@ -71,7 +165,7 @@ export async function reviewWithClaude(
 
   const response = await client.messages.create({
     model: ENV.CLAUDE_MODEL,
-    max_tokens: 2048,
+    max_tokens: 1500,
     system: systemPrompt,
     messages: [{ role: 'user', content: reviewPrompt }],
   });

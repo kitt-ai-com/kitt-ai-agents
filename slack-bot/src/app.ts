@@ -3,6 +3,8 @@ import { ENV } from './config.js';
 import { initDatabase } from './services/history.service.js';
 import { registerMentionHandler } from './handlers/mention.handler.js';
 import { registerActionHandlers } from './handlers/action.handler.js';
+import { registerThreadHandler } from './handlers/thread.handler.js';
+import { initChannelService } from './services/channel.service.js';
 
 /** Slack Bolt 앱 초기화 (Socket Mode) */
 const app = new App({
@@ -18,9 +20,18 @@ async function main(): Promise<void> {
   initDatabase();
   console.log('✅ 데이터베이스 초기화 완료');
 
+  // 봇 User ID 조회 (스레드 자동 응답에서 자기 멘션 필터링용)
+  const authResult = await app.client.auth.test({ token: ENV.SLACK_BOT_TOKEN });
+  const botUserId = authResult.user_id || '';
+  console.log(`✅ 봇 User ID: ${botUserId}`);
+
+  // 채널-팀 자동 매핑 서비스 초기화
+  initChannelService(app.client);
+
   // 핸들러 등록
   registerMentionHandler(app);
   registerActionHandlers(app);
+  registerThreadHandler(app, botUserId);
   console.log('✅ 이벤트 핸들러 등록 완료');
 
   // 앱 시작

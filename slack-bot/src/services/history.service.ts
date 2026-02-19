@@ -4,6 +4,7 @@ import type { ConversationMessage } from '../types.js';
 
 const DATA_DIR = path.resolve(__dirname, '..', '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'conversations.json');
+const SETTINGS_PATH = path.join(DATA_DIR, 'channel-settings.json');
 
 const MAX_MESSAGES_PER_THREAD = 20;
 
@@ -45,6 +46,9 @@ export function initDatabase(): void {
   }
   if (!fs.existsSync(DB_PATH)) {
     fs.writeFileSync(DB_PATH, '{}', 'utf-8');
+  }
+  if (!fs.existsSync(SETTINGS_PATH)) {
+    fs.writeFileSync(SETTINGS_PATH, '{}', 'utf-8');
   }
 }
 
@@ -100,4 +104,34 @@ export function getThreadTeam(channelId: string, threadTs: string): string | nul
   const data = loadData();
   const key = threadKey(channelId, threadTs);
   return data[key]?.team ?? null;
+}
+
+// ─── 채널-팀 설정 ───
+
+function loadSettings(): Record<string, string> {
+  try {
+    if (fs.existsSync(SETTINGS_PATH)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+/** 채널에 팀을 설정한다 */
+export function setChannelTeam(channelId: string, teamKey: string): void {
+  const settings = loadSettings();
+  settings[channelId] = teamKey;
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+/** 채널에 설정된 팀을 가져온다 */
+export function getChannelTeamSetting(channelId: string): string | null {
+  return loadSettings()[channelId] || null;
+}
+
+/** 채널의 팀 설정을 해제한다 */
+export function clearChannelTeam(channelId: string): void {
+  const settings = loadSettings();
+  delete settings[channelId];
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
 }

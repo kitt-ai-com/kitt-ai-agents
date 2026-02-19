@@ -24,3 +24,9 @@ Thumbs.db
 
 # Build output
 dist/
+
+# Google service account keys
+*-*.json
+!package.json
+!package-lock.json
+!tsconfig.json
