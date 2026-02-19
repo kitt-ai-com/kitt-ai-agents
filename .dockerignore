@@ -1,0 +1,12 @@
+node_modules
+slack-bot/node_modules
+.git
+.env
+*.bak
+*.db
+*.sqlite
+.claude
+.bkit
+.vscode
+.idea
+dist

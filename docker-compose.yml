@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  slack-bot:
+    build: .
+    container_name: ai-agent-slack-bot
+    restart: unless-stopped
+    env_file:
+      - slack-bot/.env
+    volumes:
+      # CLAUDE.md 파일들을 호스트와 공유 (학습/기준 등록 시 영구 저장)
+      - ./marketing/CLAUDE.md:/app/marketing/CLAUDE.md
+      - ./content/CLAUDE.md:/app/content/CLAUDE.md
+      - ./design/CLAUDE.md:/app/design/CLAUDE.md
+      - ./development/CLAUDE.md:/app/development/CLAUDE.md
+      - ./ecommerce/CLAUDE.md:/app/ecommerce/CLAUDE.md
+      - ./finance-ops/CLAUDE.md:/app/finance-ops/CLAUDE.md
+      - ./strategic-hq/CLAUDE.md:/app/strategic-hq/CLAUDE.md
+      - ./agent-consulting/CLAUDE.md:/app/agent-consulting/CLAUDE.md
+      - ./CLAUDE.md:/app/CLAUDE.md
+      # SQLite DB 영구 저장
+      - bot-data:/app/slack-bot/data
+
+volumes:
+  bot-data:
